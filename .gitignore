@@ -1,0 +1,25 @@
+# Nested repos: each one is its own git repository (see repos.txt / clone-all.sh)
+/Chessboard-*/
+
+# Generated output and caches
+/graphify-out/
+/.ruff_cache/
+/.worktrees/
+/.superpowers/
+/.idea/
+.DS_Store
+
+# Local tool config (carries credentials: Mongo URI, TeamCity token)
+/.air/
+/.ai/
+/.codex/
+/.claude/settings.local.json*
+/.claude/.headroom_wrap_settings.lock
+
+# Private tier: docs/ is its own private repo (ChessBoard-Docs); agent instruction files live there too
+/docs/
+/CLAUDE.md
+/AGENTS.md
+/GEMINI.md
+/.claude/
+/.agents/

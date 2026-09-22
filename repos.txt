@@ -1,0 +1,15 @@
+# One repo per line: "<github-name> [<local-dir>]", all under github.com/artfern95.
+# Lines starting with # are skipped. Local dir defaults to the repo name.
+# Chessboard-UI is not listed on purpose: it is a separate front-end checkout.
+Chessboard-Api
+Chessboard-Orchestrator-Service
+Chessboard-Engine
+Chessboard-History-Service
+Chessboard-Analysis-Service
+Chessboard-Engine-Spec
+Chessboard-History-Spec
+Chessboard-Orchestrator-Spec
+Chessboard-ChessLink-Bridge
+Chessboard-Ops-Bot
+# Private: plans, specs and agent instructions. Skipped if you have no access.
+ChessBoard-Docs docs
