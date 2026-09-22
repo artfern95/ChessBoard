@@ -16,7 +16,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   name="$1"; dir="${2:-$1}"
   if [ -d "$dir/.git" ]; then
     echo "skip  $dir (already cloned)"
-  elif git clone --quiet "$base/$name.git" "$dir" 2>/dev/null; then
+  elif git clone --quiet "$base/$name.git" "$dir" </dev/null 2>/dev/null; then
     echo "clone $name -> $dir"
   else
     echo "fail  $name (no access or does not exist), skipped"
