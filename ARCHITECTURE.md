@@ -147,7 +147,7 @@ What does not get broken without a conversation first:
 
 - **Java 21, Spring Boot 3.5.x, Spring Cloud 2025.0.x** in the six services; shared `commons.library.version`. All are WebFlux except Analysis (actuator only) and Training (servlet: Spring MVC + JPA). **No Maven wrapper** and **no aggregator POM**: every module builds on its own.
 - **No Eureka.** Discovery via Kubernetes DNS; services are addressed by their `Service` name.
-- **TeamCity** per repo (`.teamcity/` in Kotlin DSL): the `*-Spec` repos are CI-only (JAR to the registry); the six services and the Ops-Bot have CI + CD (image to the registry, `kubectl apply -k k8s/`; the bot runs its tests inside the image's `test` stage). The bridge has no pipeline.
+- **TeamCity** per repo (`.teamcity/` in Kotlin DSL): the `*-Spec` repos are CI-only (JAR to the registry); the six services and the Ops-Bot have CI + CD (image to the registry, `kubectl apply -k k8s/`; the bot runs its tests inside the image's `test` stage). The bridge repo has CI only for its npm workspace (tests, then publishes `@chessboard/*` packages to the registry); the Python bridge has no pipeline.
 - **No Ingress**: an edge Caddy (DaemonSet) → the UI's in-pod Caddy → BFF. UI and BFF **share one origin** on purpose (first-party cookie, no CORS).
 - Engine image on `ubuntu:22.04` (Stockfish requires glibc 2.35); the binary is not in the repo, `scripts/fetch-engines.sh` fetches it from the registry.
 - Training bakes the filtered lichess dataset into its image (CI fetches it from the registry, like the Stockfish binary); a one-off Kubernetes Job with the `import` profile loads it into PostgreSQL, idempotent per dataset version.
