@@ -16,6 +16,7 @@ flowchart TB
   end
 
   BFF[":chessboard-api · BFF :9136<br/>Spring Cloud Gateway + OAuth2 client"]
+  BOARD[":Millennium eONE<br/>physical board · BLE"]
 
   subgraph CORE[" ns chessboard "]
     ORCH[":chessboard-orchestrator :9135<br/>live session · HTTP + WS"]
@@ -40,6 +41,8 @@ flowchart TB
 
   UI --> BFF
   BRIDGE --> BFF
+  UI -.->|"Web Bluetooth"| BOARD
+  BRIDGE -.->|"BLE"| BOARD
   BFF -->|"TokenRelay · http and ws"| ORCH
   BFF --> HIS
   BFF --> ENG
@@ -66,7 +69,7 @@ flowchart TB
   class UI,BRIDGE io
   class BFF,ORCH,ENG,HIS,ANA,TRN step
   class REDIS,MONGO,KAFKA,PG db
-  class AUTH,USERS,CFG lib
+  class AUTH,USERS,CFG,BOARD lib
 ```
 
 ## 2. Repo map
@@ -83,7 +86,7 @@ Every module is **its own git repo**; this repo is the umbrella. Directory name,
 | `Chessboard-Training-Service` | `chessboard-training` | Servlet (Spring MVC + JPA) | 9138 | Tactics training over its own PostgreSQL: rated puzzles (Glicko-2), rush and streak sessions, history; catalogue imported from the lichess CC0 puzzle dataset |
 | `Chessboard-{Engine,History,Orchestrator,Training}-Spec` | —                         | OpenAPI contract                | —    | Codegen (`interfaceOnly`; reactive + `delegatePattern`, except Training: servlet interfaces, no delegate) → JAR to a Maven registry                                                                                                                                                                                                                            |
 | `Chessboard-Rating-Lib` | — | Java library | — | Glicko-2 rating engine (JAR to the Maven registry), used by Training |
-| `Chessboard-ChessLink-Bridge`                   | —                         | Python ≥ 3.11                   | —    | BLE ↔ WS bridge between the physical board and the live game                                                                                                                                                                                                                                       |
+| `Chessboard-ChessLink-Bridge`                   | —                         | Python ≥ 3.11 + npm workspace (TypeScript) | —    | Everything that talks to the physical board: the Python terminal bridge (BLE ↔ WS, until it is replaced) and `@chessboard/chesslink-core`, the TypeScript library (protocol, board driver, board ↔ game sync) that the browser UI uses over Web Bluetooth |
 | `Chessboard-Ops-Bot`                            | `chessboard-ops-bot`      | Python ≥ 3.12 (ns `monitoring`) | —    | Telegram bot answering `/status`, `/games`, `/alerts` and silences by reading Prometheus and Alertmanager                                                                                                                                                                                          |
 | `Chessboard-UI`                                 | `chessboard-ui`           | Angular 21                      | 8080 | SPA; its in-pod Caddy proxies the BFF so both share one origin                                                                                                                                                                                                                                     |
 
@@ -109,7 +112,7 @@ Skeleton only; per-layer detail lives in internal documentation.
 
 **Human vs machine move (browser).** UI → `ws` through the BFF (route `chessboard-orchestrator-ws`, authenticated with a **single-use ticket**) → Orchestrator validates turn and legality → `POST /games/{id}/moves` to History (CAS) → publishes `game.move-appended` → asks the Engine for `bestMove` → repeats the cycle for the reply → `move` frame to the UI. Clock in Redis; on expiry, `KeyspaceExpiryListener` closes the game.
 
-**Move from the physical board.** The bridge detects the move by **occupancy** diff (the eONE does not identify pieces) → same WS move-loop through the BFF, but over the **device channel** (`chessboard-orchestrator-devices-ws`, `SCOPE_device:link`) → the opponent's reply comes back over the socket and the bridge lights it on the LEDs. The bridge talks **only to the BFF**.
+**Move from the physical board.** The bridge detects the move by **occupancy** diff (the eONE does not identify pieces) → same WS move-loop through the BFF, but over the **device channel** (`chessboard-orchestrator-devices-ws`, `SCOPE_device:link`) → the opponent's reply comes back over the socket and the bridge lights it on the LEDs. The bridge talks **only to the BFF**. From the **browser** (Chrome and Edge, or Brave with the Web Bluetooth flag) there is no bridge: the UI talks to the eONE directly over Web Bluetooth, and the board is a *peripheral of the user's own session*, not a device. The occupancy diff runs in the browser (`@chessboard/chesslink-core`) and a wood move leaves through the same game socket as a screen move (`applyOptimistic` + a `move` frame), so there is no pairing, attach, presence or device channel and the backend does not change. The browser board and a paired board never play the same side: the UI opens no session while a paired board already holds the user's side.
 
 **Async annotation.** `game.move-appended` → Analysis (`analysis-requests`) publishes `engine.classify-requested` → Engine classifies and publishes `engine.classify-completed` → Analysis (`analysis-annotations`) publishes `game.move-annotated` → History persists the mark. Nobody on the hot path waits for this chain; the UI sees it when opening the analysis tab.
 
