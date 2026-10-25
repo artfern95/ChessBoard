@@ -6,9 +6,12 @@ Chessboard-Orchestrator-Service
 Chessboard-Engine
 Chessboard-History-Service
 Chessboard-Analysis-Service
+Chessboard-Training-Service
 Chessboard-Engine-Spec
 Chessboard-History-Spec
 Chessboard-Orchestrator-Spec
+Chessboard-Training-Spec
+Chessboard-Rating-Lib
 Chessboard-ChessLink-Bridge
 Chessboard-Ops-Bot
 # Private: plans, specs and agent instructions. Skipped if you have no access.

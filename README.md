@@ -1,6 +1,6 @@
 # ChessBoard
 
-Play chess against Stockfish or against another person — from the browser or from a **physical board** (Millennium eONE ChessLink over BLE) — with a clock, durable game history, per-move analysis and level-graded assisted play. Self-hosted on Kubernetes, built as a set of small Spring Boot and Python services around one gateway.
+Play chess against Stockfish or against another person — from the browser or from a **physical board** (Millennium eONE ChessLink over BLE) — with a clock, durable game history, per-move analysis, level-graded assisted play and tactics training. Self-hosted on Kubernetes, built as a set of small Spring Boot services around one gateway, plus a Python and TypeScript layer for the physical board.
 
 This repo is the **front door**: it holds the architecture overview and a script that clones every module next to it. Each module lives in its own repository; there is no code here.
 
@@ -15,12 +15,15 @@ This repo is the **front door**: it holds the architecture overview and a script
 | [Chessboard-Engine](https://github.com/artfern95/Chessboard-Engine)                             | `chessboard-engine`       | WebFlux                 | Stateless compute over a pool of Stockfish processes; three roles (`play`, `query`, `classify`) from one image |
 | [Chessboard-History-Service](https://github.com/artfern95/Chessboard-History-Service)           | `chessboard-history`      | WebFlux                 | Durable truth in MongoDB: games, moves, annotations, players, devices                                          |
 | [Chessboard-Analysis-Service](https://github.com/artfern95/Chessboard-Analysis-Service)         | `chessboard-analysis`     | Servlet (actuator only) | Kafka in, Kafka out: asks for each move to be classified and publishes the annotation                          |
+| [Chessboard-Training-Service](https://github.com/artfern95/Chessboard-Training-Service)         | `chessboard-training`     | Servlet (MVC + JPA)     | Tactics training over PostgreSQL: rated puzzles (Glicko-2), rush and streak sessions                           |
 | [Chessboard-Engine-Spec](https://github.com/artfern95/Chessboard-Engine-Spec)                   | —                         | OpenAPI contract        | Codegen → JAR; also publishes the `play` / `query` role views                                                  |
 | [Chessboard-History-Spec](https://github.com/artfern95/Chessboard-History-Spec)                 | —                         | OpenAPI contract        | Codegen → JAR                                                                                                  |
 | [Chessboard-Orchestrator-Spec](https://github.com/artfern95/Chessboard-Orchestrator-Spec)       | —                         | OpenAPI contract        | Codegen → JAR (Games, Invites, Meta; the move-loop goes over WS)                                               |
-| [Chessboard-ChessLink-Bridge](https://github.com/artfern95/Chessboard-ChessLink-Bridge)         | —                         | Python ≥ 3.11           | BLE ↔ WS bridge between the physical board and the live game                                                   |
+| [Chessboard-Training-Spec](https://github.com/artfern95/Chessboard-Training-Spec)               | —                         | OpenAPI contract        | Codegen → JAR (servlet interfaces, no delegate)                                                                |
+| [Chessboard-Rating-Lib](https://github.com/artfern95/Chessboard-Rating-Lib)                     | —                         | Java library            | Glicko-2 rating engine, used by Training                                                                       |
+| [Chessboard-ChessLink-Bridge](https://github.com/artfern95/Chessboard-ChessLink-Bridge)         | —                         | Python + npm workspace  | Everything that talks to the physical board: the Python BLE ↔ WS bridge and `@chessboard/chesslink-core` (TS)  |
 | [Chessboard-Ops-Bot](https://github.com/artfern95/Chessboard-Ops-Bot)                           | `chessboard-ops-bot`      | Python ≥ 3.12           | Telegram bot: `/status`, `/games`, `/alerts` and silences, reading Prometheus and Alertmanager                 |
-| [Chessboard-UI](https://github.com/artfern95/Chessboard-UI)                                     | `chessboard-ui`           | Angular                 | SPA; its in-pod Caddy proxies the BFF so both share one origin                                                 |
+| [Chessboard-UI](https://github.com/artfern95/Chessboard-UI)                                     | `chessboard-ui`           | Angular 21              | SPA; its in-pod Caddy proxies the BFF so both share one origin                                                 |
 
 Directory name, `artifactId` and `spring.application.name` do not match on purpose; `ARCHITECTURE.md` §2 is the source of truth.
 
@@ -44,9 +47,11 @@ ChessBoard/
 ├── Chessboard-Engine/              │ one git repo each,
 ├── Chessboard-History-Service/     │ built and deployed independently
 ├── Chessboard-Analysis-Service/    │
+├── Chessboard-Training-Service/    │
 ├── Chessboard-*-Spec/              │
+├── Chessboard-Rating-Lib/          │
 ├── Chessboard-ChessLink-Bridge/    │
 └── Chessboard-Ops-Bot/             ┘
 ```
 
-Each module's README explains how to build and run it. Java modules need Java 21 and Maven; the bridge and the bot need Python.
+Each module's README explains how to build and run it. Java modules need Java 21 and Maven; the bridge needs Python and Node ≥ 22.12 for its npm workspace; the bot needs Python.
