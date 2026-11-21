@@ -2,7 +2,7 @@
 
 Bird's-eye view of the ecosystem: what exists, where it lives, who owns which truth and why it has this shape. It does **not** explain how each module is built (each repo's README does) nor how an endpoint works inside (that is internal documentation). Anything that changes weekly — exact versions, phase status, debt — is left out on purpose.
 
-Verified against the code on 2026-09-27.
+Verified against the code on 2026-11-21.
 
 ## 1. What it is
 
@@ -80,7 +80,7 @@ Every module is **its own git repo**; this repo is the umbrella. Directory name,
 | ----------------------------------------------- | ------------------------- | ------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Chessboard-Api`                                | `chessboard-api`          | Gateway BFF                     | 9136 | The edge: browser session, OAuth2, proxy with `TokenRelay=` to everything else                                                                                                                                                                                                                     |
 | `Chessboard-Orchestrator-Service`               | `chessboard-orchestrator` | WebFlux                         | 9135 | Live game session: turn, clock, WS move-loop, matchmaking, device channel                                                                                                                                                                                                                          |
-| `Chessboard-Engine`                             | `chessboard-engine`       | WebFlux                         | 9133 | Stateless compute over a pool of Stockfish processes (UCI). **Three Deployments of the same image** by `CHESSBOARD_ENGINE_ROLE`: `play` (move-loop + options), `query` (`chessboard-engine-query`: eval/analysis/classify at full strength), `classify` (`chessboard-engine-analysis`: Kafka only) |
+| `Chessboard-Engine`                             | `chessboard-engine`       | WebFlux                         | 9133 | Stateless compute over a pool of Stockfish processes (UCI). One Deployment (`chessboard-engine-service`, role `unified`): the play and query APIs plus the Kafka classify consumer share one pool of 3 engines per pod, with one engine reserved for live play (`stockfish.pool.play-reserve`) |
 | `Chessboard-History-Service`                    | `chessboard-history`      | WebFlux                         | 9134 | Durable truth in MongoDB: games, moves, annotations, players, devices                                                                                                                                                                                                                              |
 | `Chessboard-Analysis-Service`                   | `chessboard-analysis`     | Servlet (actuator only)         | 9137 | Kafka in, Kafka out: asks for each move to be classified and publishes the annotation                                                                                                                                                                                                              |
 | `Chessboard-Training-Service` | `chessboard-training` | Servlet (Spring MVC + JPA) | 9138 | Tactics training over its own PostgreSQL: rated puzzles (Glicko-2), rush and streak sessions, history; catalogue imported from the lichess CC0 puzzle dataset |
@@ -144,7 +144,7 @@ What does not get broken without a conversation first:
 | **Maven registry** (Nexus)    | Everyone                                 | Contract JARs, internal libs (`errors-reactive`, `metrics`), the rating library, the filtered lichess puzzle dataset, Stockfish binaries, Docker images                                                                                                        |
 | **OTLP collector**            | Engine, History, Orchestrator, Training  | Metrics + traces, full sampling                                                                                                                                                                       |
 | **Prometheus + Alertmanager** | Ops-Bot (reads); Alertmanager → Telegram | Same bot and same `alertmanager-telegram` Secret in `monitoring`; the bot only answers the authorised chat                                                                                            |
-| **KEDA** (ns `keda`)          | The three Engine roles                   | One `ScaledObject` per role: `cpu` + `chess_pool_pending` (play/query) or lag of the `engine-classify` group (classify); `fallback.replicas: 2`. The cluster's only `external.metrics.k8s.io` adapter |
+| **KEDA** (ns `keda`)          | The Engine                               | One `ScaledObject` (2–4 replicas): `cpu` + pending leases (`chess_pool_pending` + `chess_admission_pending`) + lag of the `engine-classify` group; `fallback.replicas: 2`. The cluster's only `external.metrics.k8s.io` adapter |
 
 ## 7. Build and deploy
 
@@ -168,7 +168,7 @@ Summary; full ADRs are internal.
 | D5  | **Reuse** the house `authorization-server`                 | OAuth2 clients are declared in the identity provisioning repo, not here                                                                                                |
 | —   | **Async** enrichment in a separate service (Analysis)      | Zero HTTP in Analysis; a chain of three topics instead of one synchronous call                                                                                         |
 | —   | **Training** as its own servlet service on PostgreSQL, catalogue **imported** from the lichess CC0 dataset | No Kafka and no calls to other services; rating, attempts and sessions live in relational tables; puzzles are not generated, the dataset is filtered once per version and loaded by a Job |
-| D6  | Engine in **three roles** by contract tag + **Elo levels** | `difficulty` 0–20 → `stockfish.levels` (`UCI_Elo` + `go` + `sampling-cp`), not `Skill Level`; `move` via chesslib without a lease; `query`/`classify` at full strength |
+| D6  | Engine roles by contract tag + **Elo levels**, run as **one Deployment** | `difficulty` 0–20 → `stockfish.levels` (`UCI_Elo` + `go` + `sampling-cp`), not `Skill Level`; `move` via chesslib without a lease. The `play`/`query`/`classify` roles stay in the contract and the code, but production runs them together (role `unified`): an admission gate caps non-play leases at `max-size − play-reserve` engines so analysis and classification never starve the live game |
 
 ## 9. Known limits
 
